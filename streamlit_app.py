@@ -666,6 +666,28 @@ def main():
     st.write(npv_df.fillna(0))
     st.markdown("---")
 
+    # Define the Graphviz diagram as a string
+    graph = """
+        digraph {
+            node [shape=box]
+            // Define nodes
+            root [label="Expand EV Station Capacity"]
+            no [label="No: Original Baseline"]
+            yes [label="Yes"]
+            upgrade [label="Upgrade Capacity 4 to 6"]
+            build [label="Build Additional Stations"]
+
+            // Define edges
+            root -> no
+            root -> yes
+            yes -> upgrade
+            yes -> build
+        }
+    """
+
+    # Use Streamlit's graphviz_chart to render the graph
+    st.graphviz_chart(graph)
+
     # NPV mt addition vs original
     cost_of_upgrade_b = (20000 * 2) + (15000 * 2) # Land aquisition + build cost  
     discount_rate = 0.05  # Annual discount rate
