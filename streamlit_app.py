@@ -385,7 +385,7 @@ def main():
     # Display the image alongside the title
     col1, col2 = st.columns([1, 8])
     with col1:
-        st.image(logo, width=80, caption='BlueSG', classes="logo-img")  # Using custom classes
+        st.image(logo, width=80, caption='BlueSG')  # Using custom classes
     with col2:
         st.title('EV Station Upgrade Analysis')
 
