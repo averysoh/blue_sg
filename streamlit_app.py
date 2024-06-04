@@ -361,6 +361,7 @@ def create_visual(G, positions, trip_data, park_q_data, upgraded_nodes=[], seed=
     return fig
 
 def plot_monte_carlo_cones(data_original, data_upgrade, data_added, title, ylabel):
+    num_days = 30
     days = np.arange(1, num_days + 1)
     fig = go.Figure()
     percentiles = [10, 90] 
@@ -642,8 +643,6 @@ def main():
     cumulative_pv = npv_df.loc['Present Value'].cumsum()
     payback_year = np.flatnonzero(cumulative_pv >= 0)[0] if np.any(cumulative_pv >= 0) else None
 
-    print(f"Cost of Upgrade: ${cost_of_upgrade}")
-    print(f"Value Creation: ${cumulative_pv[-1]:.2f}")
     if payback_year is not None:
         payback_msg_uvo = f"{payback_year:.1f} years"
     else:
@@ -666,18 +665,45 @@ def main():
     st.write(npv_df.fillna(0))
     st.markdown("---")
 
+    # NPV mt addition vs original
+    cost_of_upgrade_b = 10000 * len(stations_to_upgrade)  
+    discount_rate = 0.05  # Annual discount rate
+    additional_revenue_daily = revenue_results_u.flatten() - revenue_results.flatten()
+    days_per_year = 365
+    years_of_data = len(additional_revenue_daily) // days_per_year
+    years_of_data = min(years_of_data, 5)  # Assume we want at most 5 years of data
+    annual_revenue = [np.sum(additional_revenue_daily[i * days_per_year:(i + 1) * days_per_year]) for i in range(years_of_data)]
+    index = ['Annual Revenue', 'Cost', 'Present Value']
+    years = ['Year 0'] + [f'Year {i + 1}' for i in range(years_of_data)]
+    npv_df = pd.DataFrame(index=index, columns=years)
+    npv_df.loc['Annual Revenue', 'Year 1':] = annual_revenue  # Start from Year 1 for revenue
+    npv_df.loc['Cost', 'Year 0'] = -cost_of_upgrade_b
+    for i in range(1, years_of_data + 1):
+        npv_df.loc['Present Value', f'Year {i}'] = npv_df.loc['Annual Revenue', f'Year {i}'] / ((1 + discount_rate) ** i)
+    npv_df.loc['Present Value', 'Year 0'] = npv_df.loc['Cost', 'Year 0']
+    # NPV and other summaries
+    cumulative_pv_b = npv_df.loc['Present Value'].cumsum()
+    payback_year = np.flatnonzero(cumulative_pv_b >= 0)[0] if np.any(cumulative_pv_b >= 0) else None
+
+    if payback_year is not None:
+        payback_msg_bvo = f"{payback_year:.1f} years"
+    else:
+        payback_msg_bvo = "Payback period not achievable within 5 years or -ve infinite"
+
 
     st.subheader("NPV Build additional stations vs Upgrade")
     st.markdown("""
                 Assumes 10K per upgrade 
                 
-                Assumes 20k per build
+                Cost from building: ${cost_of_upgrade_b}
 
-                Assume land aquisition cost at 10k
-                
-                Estimated payback period: **{payback_msg}**
+                Value Creation by building: ${cumulative_pv_b[-1]:.2f}
+
+                Estimated payback period for building: **{payback_msg_bvo}**
     """.format(
-                payback_msg=payback_msg
+                payback_msg_bvo=payback_msg_bvo,
+                cost_of_upgrade_b = cost_of_upgrade_b,
+                cumulative_pv_b=cumulative_pv_b
             ))
     st.write(npv_df.fillna(0))
     st.markdown("---")
