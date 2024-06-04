@@ -398,8 +398,9 @@ def main():
         upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
 
         # Constants
+        MAX_CHARGING_POINTS = 4 
         TOTAL_CARS = min(TOTAL_CARS, MAX_CHARGING_POINTS * TOTAL_STATIONS)
-        MAX_CHARGING_POINTS = 4  # Maximum charging points in the future
+         # Maximum charging points in the future
         start_date = datetime(2024, 5, 1)
 
     with st.expander("Simulation Parameters", expanded=False):
