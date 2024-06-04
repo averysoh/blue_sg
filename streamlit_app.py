@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.cluster import DBSCAN
 import plotly.graph_objects as go
-# import network_utils as nu
-# import data_generation as dg
 import streamlit as st
+from PIL import Image
 
 ## Hour and Minute Probability Function
 def hour_minute_prob(h, m):
@@ -256,7 +255,6 @@ def generate_trip_data(total_requests, total_cars, total_stations, max_station_c
     charge_data = pd.DataFrame(charge_status).sort_values(['entry_datetime'])
     return trip_data, charge_data, car_q_pop_df, park_q_pop_df, station_cluster_mapping
 
-
 def ensure_positions(G, positions, seed=42):
     # Ensure all nodes have positions
     missing_nodes = [node for node in G.nodes() if node not in positions]
@@ -366,14 +364,62 @@ np.random.seed(seed)
 
 # Streamlit app
 def main():
-    st.title('EV Station Upgrade Simulation')
+    # Load your image
+    image_path = '/mnt/data/bluesglogo.png'
+    logo = Image.open(image_path)
 
-    # Constants
-    TOTAL_CARS = 160
-    TOTAL_STATIONS = 50
-    TOTAL_REQUESTS = 100
-    MAX_CHARGING_POINTS = 4  # Maximum charging points in the future
-    start_date = datetime(2024, 5, 1)
+    # Add custom CSS to make the image circular
+    st.markdown(
+        """
+        <style>
+        .logo-img {
+            border-radius: 50%;  # Makes the image circular
+            width: auto;  # Adjust the width to fit your layout or keep it responsive
+            height: 80px;  # Fixed height, adjust as necessary
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Display the image alongside the title
+    col1, col2 = st.columns([1, 8])
+    with col1:
+        st.image(logo, width=80, caption='BlueSG', classes="logo-img")  # Using custom classes
+    with col2:
+        st.title('EV Station Upgrade Analysis')
+
+    with st.sidebar:
+        st.header('Simulation Parameters')
+        # Constants with sliders for interactivity
+        TOTAL_CARS = st.slider('Total Cars', min_value=10, max_value=300, value=160, step=10)
+        TOTAL_STATIONS = st.slider('Total Stations', min_value=10, max_value=100, value=50, step=5)
+        TOTAL_REQUESTS = st.slider('Total Requests', min_value=50, max_value=200, value=100, step=50)
+        upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
+
+        # Constants
+        TOTAL_CARS = min(TOTAL_CARS, MAX_CHARGING_POINTS * TOTAL_STATIONS)
+        MAX_CHARGING_POINTS = 4  # Maximum charging points in the future
+        start_date = datetime(2024, 5, 1)
+
+    with st.expander("Simulation Parameters", expanded=False):
+        st.markdown("""
+        **Time Frame**: 1 day  
+        **Total cars**: {total_cars} (`{utilization:.2f}%` of maximum capacity based on cars and charging points.)
+        **Total stations**: {total_stations}  
+        **Total requests**: {total_requests} (indicates the number of rental requests. This does not mean there are 100 confirmed orders for rentals in the day but rather 100 attempts, where some orders may succeed or fail based on the availability of cars and parking.)
+        **Max charging points**: {max_charging_points}  
+
+        ---
+        Many other assumptions are made, please refer to appendix
+        """.format(
+            total_cars=TOTAL_CARS,
+            max_charging_points=MAX_CHARGING_POINTS,
+            total_stations=TOTAL_STATIONS,
+            total_requests=TOTAL_REQUESTS,
+            utilization=(TOTAL_CARS / (MAX_CHARGING_POINTS * TOTAL_STATIONS)) * 100
+        ))
+
 
     # Generate positions and labels for stations
     positions, labels = generate_ev_stations(TOTAL_STATIONS)
@@ -385,21 +431,19 @@ def main():
         start_date, station_map, labels, [])
 
     # Show basic data counts
-    st.subheader("Data Overview (No Upgrade)")
-    st.write(f'Total Trips: {len(trip_data)}')
-    st.write(f'Total Charges: {len(charge_data)}')
-    st.write(f'Car Queue Length: {len(car_q_data)}')
-    st.write(f'Parking Queue Length: {len(park_q_data)}')
-
+    st.subheader("Simulate upgrade of key stations")
     # Analyze parking data for upgrades
     unsuccessful_parking_counts = park_q_data[park_q_data['event_status'] == 'unsuccessful']['station_id'].value_counts()
     successful_parking_counts = park_q_data[park_q_data['event_status'] == 'successful']['station_id'].value_counts()
     upgrade_scores = (unsuccessful_parking_counts * 1.5 + successful_parking_counts).fillna(0).sort_values(ascending=False)
-
-    # Upgrade analysis
-    st.subheader("Stations Recommended for Upgrade")
-    upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
+    upgrade_scores.columns = ['Station ID', 'Score']
+    # upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
     stations_to_upgrade = list(upgrade_scores[:upgrade_station_count].index)
+    st.markdown("""
+These are the stations identified for upgrade, selected based on a combination of:
+                - Urgency (Customer tried to choose this place to park but failed = revenue loss)
+                - Popularity (Customers frequently choose this place to park)
+""")
     st.write(upgrade_scores.head(upgrade_station_count))
 
     # Simulate data with upgrades
@@ -407,12 +451,10 @@ def main():
         TOTAL_REQUESTS, TOTAL_CARS, TOTAL_STATIONS, MAX_CHARGING_POINTS, 
         start_date, station_map, labels, stations_to_upgrade)
 
-    st.subheader("Comparison Overview (With Upgrade)")
-    st.write(f'Original vs Upgraded Trips: {len(trip_data)} vs {len(trip_data_up)}')
-    st.write(f'Original vs Upgraded Revenue: ${trip_data["revenue"].sum()} vs ${trip_data_up["revenue"].sum()}')
-
     # Visualization (Assuming `create_visual` is a function from your network_utils that returns a Plotly figure)
-    st.subheader("Network Visualization")
+    st.subheader("Mapping out the fleet of stations")
+    st.write("Bigger circles means more customers park there")
+    st.write("Dark red circles indicate more failed attempts to park")
     G_initial = create_graph(trip_data)
     positions = compute_positions(G_initial, seed)
     fig = create_visual(G_initial, positions, trip_data, park_q_data, upgraded_nodes=[], seed=seed)
@@ -420,6 +462,84 @@ def main():
 
     fig_new = create_visual(G_initial, positions, trip_data_up, park_q_data_up, upgraded_nodes=stations_to_upgrade, seed=seed)
     st.plotly_chart(fig_new)
+
+    st.subheader("Comparison Overview")
+    completed_trips_o = len(trip_data)
+    completed_trips_upgrade = len(trip_data_up)
+    revenue_o = trip_data['revenue'].sum()
+    revenue_upgrade = trip_data_up['revenue'].sum()
+    unsuccessful_parking_count_o = len(park_q_data[park_q_data['event_status'] == 'unsuccessful'])
+    unsuccessful_parking_count_upgrade = len(park_q_data_up[park_q_data_up['event_status'] == 'unsuccessful'])
+
+    trips_completed_change = round((completed_trips_upgrade / completed_trips_o - 1) * 100, 2)
+    revenue_change = round(((revenue_upgrade / revenue_o) - 1) * 100, 2)
+    unsuccessful_parking_change = round((unsuccessful_parking_count_upgrade / unsuccessful_parking_count_o - 1) * 100, 2)
+    temp_data = {
+        'Metric': ['Trips Completed', 'Revenue Generated ($)', 'Unsuccessful Parking'],
+        'Original': [completed_trips_o, revenue_o, unsuccessful_parking_count_o],
+        'Upgraded': [completed_trips_upgrade, revenue_upgrade, unsuccessful_parking_count_upgrade],
+        'Change (%)': [trips_completed_change, revenue_change, unsuccessful_parking_change]
+    }
+    results_df = pd.DataFrame(temp_data)
+    st.write(results_df)
+
+
+    cost_of_upgrade = 10000 * upgrade_station_count  # Upgrade cost only for the first year
+    discount_rate = 0.05  # Annual discount rate
+    daily_revenue = revenue_upgrade - revenue_o  # Daily revenue after upgrade, adjust accordingly
+    days_per_year = 365  # Days in a year
+    annual_revenues = [daily_revenue * days_per_year for _ in range(5)]  # Repeat the revenue for 5 years
+    years = ['Year 0', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5']
+    npv_df = pd.DataFrame(index=['Revenue', 'Cost', 'Present Value'], columns=years)
+    npv_df.loc['Revenue', 'Year 1':] = annual_revenues
+    npv_df.loc['Cost', 'Year 0'] = -cost_of_upgrade
+    npv_df.loc['Present Value', 'Year 1':] = [
+        revenue / ((1 + discount_rate) ** i) for i, revenue in enumerate(annual_revenues, start=1)
+    ]
+    npv_df.loc['Present Value', 'Year 0'] = npv_df.loc['Cost', 'Year 0']
+    # Calculate cumulative present value to determine payback period
+    cumulative_pv = npv_df.loc['Present Value'].cumsum()
+    payback_year = np.flatnonzero(cumulative_pv >= 0)[0] if np.any(cumulative_pv >= 0) else None
+    # Compute exact year fraction for payback
+    if payback_year is not None:
+        if payback_year == 0:
+            payback_period = 0
+        else:
+            cumulative_before_payback = cumulative_pv.iloc[payback_year - 1]
+            revenue_needed = -cumulative_before_payback
+            year_revenue = npv_df.loc['Present Value', f'Year {payback_year}']
+            fraction_year = revenue_needed / year_revenue
+            payback_period = payback_year + fraction_year - 1
+        payback_msg = f"{payback_period:.1f} years"
+    else:
+        payback_msg = "Payback period not achievable within 5 years or infinite"
+
+    st.subheader("Projected NPV (Very rough estimate)")
+    st.markdown("""
+                Assumes 10K per upgrade <br> 
+                Estimated payback period: **{payback_msg}**
+""".format(
+            payback_msg=payback_msg
+        ))
+    st.write(npv_df)
+
+
+
+    # Add custom CSS to place the footer at the bottom right of the app
+    st.markdown("""
+        <style>
+        .footer {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            color: grey;
+            text-align: right;
+            font-size: small;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<div class="footer">Created by Avery Soh</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
