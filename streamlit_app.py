@@ -654,13 +654,13 @@ def main():
                 
                 Cost of Upgrade: ${cost_of_upgrade}
 
-                Value Creation: ${cumulative_pv[-1]:.2f}
+                Value Creation: ${cumul:.2f}
 
                 Estimated payback period: **{payback_msg_uvo}**
     """.format(
                 payback_msg_uvo=payback_msg_uvo,
                 cost_of_upgrade = cost_of_upgrade,
-                cumulative_pv=cumulative_pv
+                cumul=cumulative_pv[-1]
             ))
     st.write(npv_df.fillna(0))
     st.markdown("---")
@@ -697,13 +697,13 @@ def main():
                 
                 Cost from building: ${cost_of_upgrade_b}
 
-                Value Creation by building: ${cumulative_pv_b[-1]:.2f}
+                Value Creation by building: ${cumul:.2f}
 
                 Estimated payback period for building: **{payback_msg_bvo}**
     """.format(
                 payback_msg_bvo=payback_msg_bvo,
                 cost_of_upgrade_b = cost_of_upgrade_b,
-                cumulative_pv_b=cumulative_pv_b
+                cumul=cumulative_pv_b[-1]
             ))
     st.write(npv_df.fillna(0))
     st.markdown("---")
