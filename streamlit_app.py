@@ -365,7 +365,7 @@ np.random.seed(seed)
 # Streamlit app
 def main():
     # Load your image
-    image_path = '/mnt/data/bluesglogo.png'
+    image_path = '/data/bluesglogo.png'
     logo = Image.open(image_path)
 
     # Add custom CSS to make the image circular
