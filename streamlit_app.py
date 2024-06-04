@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.cluster import DBSCAN
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 import streamlit as st
 from PIL import Image
+import pickle
 
 ## Hour and Minute Probability Function
 def hour_minute_prob(h, m):
@@ -358,6 +360,50 @@ def create_visual(G, positions, trip_data, park_q_data, upgraded_nodes=[], seed=
 
     return fig
 
+def plot_monte_carlo_cones(data_original, data_upgrade, data_added, title, ylabel):
+    days = np.arange(1, num_days + 1)
+    fig = go.Figure()
+    percentiles = [10, 90] 
+    for data, color, label in zip([data_original, data_upgrade, data_added], ['#1f77b4', '#ff7f0e', '#2ca02c'], ['Original', 'Upgraded', 'Added Stations']):
+        mean_data = np.mean(data, axis=0)
+        lower_bound = np.percentile(data, percentiles[0], axis=0)
+        upper_bound = np.percentile(data, percentiles[1], axis=0)
+
+        # Adding the mean line
+        fig.add_trace(go.Scatter(
+            x=days, y=mean_data,
+            mode='lines',
+            line=dict(color=color),
+            name=f'{label} Mean'
+        ))
+
+        # Adding the confidence interval as a filled area
+        fig.add_trace(go.Scatter(
+            x=np.concatenate([days, days[::-1]]),  # x, then x reversed
+            y=np.concatenate([upper_bound, lower_bound[::-1]]),  # upper, then lower reversed
+            fill='toself',
+            fillcolor='rgba' + str(tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4)) + (0.3,)),
+            line=dict(color='rgba(255,255,255,0)'),
+            name=f'{label} {percentiles[0]}-{percentiles[1]} Percentile Range'
+        ))
+
+    # Update the layout to add titles and labels
+    fig.update_layout(
+        title=title,
+        xaxis_title='Day',
+        yaxis_title=ylabel,
+        template='plotly',
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        )
+    )
+
+    return fig
+
+
 # Set the seed for reproducibility
 seed = 1
 np.random.seed(seed)
@@ -392,8 +438,8 @@ def main():
     with st.sidebar:
         st.header('Simulation Parameters')
         # Constants with sliders for interactivity
-        TOTAL_CARS = st.slider('Total Cars', min_value=10, max_value=300, value=160, step=10)
-        TOTAL_STATIONS = st.slider('Total Stations', min_value=10, max_value=100, value=50, step=5)
+        TOTAL_CARS = st.slider('Total Cars', min_value=10, max_value=300, value=160, step=10, disabled=True)
+        TOTAL_STATIONS = st.slider('Total Stations', min_value=10, max_value=100, value=50, step=5, disabled=True)
         TOTAL_REQUESTS = st.slider('Total Requests', min_value=50, max_value=200, value=100, step=50)
         upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
 
@@ -405,15 +451,20 @@ def main():
 
     with st.expander("Simulation Parameters", expanded=False):
         st.markdown("""
-        **Time Frame**: 1 day  
-        **Total cars**: {total_cars} (`{utilization:.2f}%` of maximum capacity based on cars and charging points.)
-        **Total stations**: {total_stations}  
-        **Total requests**: {total_requests} (indicates the number of rental requests. This does not mean there are 100 confirmed orders for rentals in the day but rather 100 attempts, where some orders may succeed or fail based on the availability of cars and parking.)
-        **Max charging points**: {max_charging_points}  
+    **Time Frame**: 1 day
 
-        ---
-        Many other assumptions are made, please refer to appendix
-        """.format(
+    **Total cars**: {total_cars} (`{utilization:.2f}%` of maximum capacity based on cars and charging points.)
+
+    **Total stations**: {total_stations}
+
+    **Total requests**: {total_requests} (indicates the number of rental requests. This does not mean there are 100 confirmed orders for rentals in the day but rather 100 attempts, where some orders may succeed or fail based on the availability of cars and parking.)
+
+    **Max charging points**: {max_charging_points}
+
+    ---
+
+    Many other assumptions are made, please refer to appendix
+    """.format(
             total_cars=TOTAL_CARS,
             max_charging_points=MAX_CHARGING_POINTS,
             total_stations=TOTAL_STATIONS,
@@ -437,14 +488,16 @@ def main():
     unsuccessful_parking_counts = park_q_data[park_q_data['event_status'] == 'unsuccessful']['station_id'].value_counts()
     successful_parking_counts = park_q_data[park_q_data['event_status'] == 'successful']['station_id'].value_counts()
     upgrade_scores = (unsuccessful_parking_counts * 1.5 + successful_parking_counts).fillna(0).sort_values(ascending=False)
-    upgrade_scores.columns = ['Station ID', 'Score']
+    upgrade_scores_df = upgrade_scores.to_frame(name='Score')
+    upgrade_scores_df.reset_index(inplace=True)
+    upgrade_scores_df.columns = ['Station ID', 'Score']
     # upgrade_station_count = st.slider('Select number of stations to upgrade', 1, 20, 5)
     stations_to_upgrade = list(upgrade_scores[:upgrade_station_count].index)
     st.markdown("""
-These are the stations identified for upgrade, selected based on a combination of:
-                - Urgency (Customer tried to choose this place to park but failed = revenue loss)
-                - Popularity (Customers frequently choose this place to park)
-""")
+    These are the stations identified for upgrade, selected based on a combination of:
+    - Urgency (Customer tried to choose this place to park but failed = revenue loss)
+    - Popularity (Customers frequently choose this place to park)
+    """)
     st.write(upgrade_scores.head(upgrade_station_count))
 
     # Simulate data with upgrades
@@ -517,14 +570,117 @@ These are the stations identified for upgrade, selected based on a combination o
 
     st.subheader("Projected NPV (Very rough estimate)")
     st.markdown("""
-                Assumes 10K per upgrade <br> 
+                Assumes 10K per upgrade 
+                
                 Estimated payback period: **{payback_msg}**
-""".format(
-            payback_msg=payback_msg
-        ))
-    st.write(npv_df)
+    """.format(
+                payback_msg=payback_msg
+            ))
+    st.write(npv_df.fillna(0))
+    st.markdown("---")
+    st.title("Monte Carlo Simulation")
+    st.write("A somewhat more accurate static simulation (parameters fixed)")
+    with st.expander("Monte Carlo Parameters", expanded=False):
+        st.markdown("""
+        **Monte Carlo method** provides a robust statistical basis to simulate various parking scenarios, incorporating randomness to predict the outcomes based on different probabilities of parking success and failure.
+
+        **Total cars**: 160
+
+        **Total stations**: 50
+
+        **Total requests**: 100 per day with 20% variability (over 5 years)
+
+        **Number of stations upgraded**: 5
+                            
+        **Additional stations built**: 2
+        ---
+        """)
+    # Loading arrays from a pickle file
+    with open('data/monte_carlo_simulation_data.pickle', 'rb') as f:
+        revenue_results, revenue_results_u, revenue_results_add, parking_results, parking_results_u, parking_results_add = pickle.load(f)
+
+    # Histogram visual
+    hist_data = [revenue_results.flatten(), revenue_results_u.flatten(), revenue_results_add.flatten()]
+    group_labels = ['Original', 'Upgraded', 'Built Additional Stations']
+    fig_h = ff.create_distplot(hist_data, group_labels, bin_size=20, show_hist=True, show_rug=False)
+
+    # Update the layout
+    fig_h.update_layout(
+        title='Distribution of Projected Revenues from Monte Carlo Simulation',
+        xaxis_title='Revenue',
+        yaxis_title='Frequency',
+        template='plotly'  # You can choose other templates like 'plotly', 'plotly_white', etc.
+    )
+    st.plotly_chart(fig_h)
+    st.subheader("Monte Carlo Cone of Confidence")
+    st.write("By simulating the scenario over 30 days for 100 iterations, we obtain a prediction cone that captures the outcomes between the 10th and 90th percentiles")
+    fig_m_rev = plot_monte_carlo_cones(np.cumsum(revenue_results, axis=1), np.cumsum(revenue_results_u, axis=1), np.cumsum(revenue_results_add, axis=1), 'Cumulative Revenue Forecast over Time, 100 sims', 'Cumulative Revenue')
+    fig_m_park = plot_monte_carlo_cones(np.cumsum(parking_results, axis=1), np.cumsum(parking_results_u, axis=1), np.cumsum(parking_results_add, axis=1), 'Cumulative Unsuccessful Parking Forecast over Time', 'Cumulative Unsuccessful Parking')
+    st.plotly_chart(fig_m_rev)
+    st.plotly_chart(fig_m_park)
+
+    st.subheader("Seems like adding more stations instead of upgrading performs better")
+    st.write("Let us check the cost benefit analysis")
+
+    # NPV mt upgrade vs original
+    cost_of_upgrade = 10000 * len(stations_to_upgrade)  
+    discount_rate = 0.05  # Annual discount rate
+    additional_revenue_daily = revenue_results_u.flatten() - revenue_results.flatten()
+    days_per_year = 365
+    years_of_data = len(additional_revenue_daily) // days_per_year
+    years_of_data = min(years_of_data, 5)  # Assume we want at most 5 years of data
+    annual_revenue = [np.sum(additional_revenue_daily[i * days_per_year:(i + 1) * days_per_year]) for i in range(years_of_data)]
+    index = ['Annual Revenue', 'Cost', 'Present Value']
+    years = ['Year 0'] + [f'Year {i + 1}' for i in range(years_of_data)]
+    npv_df = pd.DataFrame(index=index, columns=years)
+    npv_df.loc['Annual Revenue', 'Year 1':] = annual_revenue  # Start from Year 1 for revenue
+    npv_df.loc['Cost', 'Year 0'] = -cost_of_upgrade
+    for i in range(1, years_of_data + 1):
+        npv_df.loc['Present Value', f'Year {i}'] = npv_df.loc['Annual Revenue', f'Year {i}'] / ((1 + discount_rate) ** i)
+    npv_df.loc['Present Value', 'Year 0'] = npv_df.loc['Cost', 'Year 0']
+    # NPV and other summaries
+    cumulative_pv = npv_df.loc['Present Value'].cumsum()
+    payback_year = np.flatnonzero(cumulative_pv >= 0)[0] if np.any(cumulative_pv >= 0) else None
+
+    print(f"Cost of Upgrade: ${cost_of_upgrade}")
+    print(f"Value Creation: ${cumulative_pv[-1]:.2f}")
+    if payback_year is not None:
+        payback_msg_uvo = f"{payback_year:.1f} years"
+    else:
+        payback_msg_uvo = "Payback period not achievable within 5 years or -ve infinite"
+
+    st.subheader("NPV Upgrade vs original")
+    st.markdown("""
+                Assumes 10K per upgrade 
+                
+                Cost of Upgrade: ${cost_of_upgrade}
+
+                Value Creation: ${cumulative_pv[-1]:.2f}
+
+                Estimated payback period: **{payback_msg_uvo}**
+    """.format(
+                payback_msg_uvo=payback_msg_uvo,
+                cost_of_upgrade = cost_of_upgrade,
+                cumulative_pv=cumulative_pv
+            ))
+    st.write(npv_df.fillna(0))
+    st.markdown("---")
 
 
+    st.subheader("NPV Build additional stations vs Upgrade")
+    st.markdown("""
+                Assumes 10K per upgrade 
+                
+                Assumes 20k per build
+
+                Assume land aquisition cost at 10k
+                
+                Estimated payback period: **{payback_msg}**
+    """.format(
+                payback_msg=payback_msg
+            ))
+    st.write(npv_df.fillna(0))
+    st.markdown("---")
 
     # Add custom CSS to place the footer at the bottom right of the app
     st.markdown("""
