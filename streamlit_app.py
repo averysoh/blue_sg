@@ -648,7 +648,7 @@ def main():
     else:
         payback_msg_uvo = "Payback period not achievable within 5 years or -ve infinite"
 
-    st.subheader("NPV Upgrade vs original")
+    st.subheader("NPV Upgrade vs Original")
     st.markdown("""
                 Assumes 10K per upgrade 
                 
@@ -691,7 +691,7 @@ def main():
         payback_msg_bvo = "Payback period not achievable within 5 years or -ve infinite"
 
 
-    st.subheader("NPV Build additional stations vs Upgrade")
+    st.subheader("NPV Build additional stations vs Original")
     st.markdown("""
                 Assumes 15K per build and 20k per land aquisition 
                 
@@ -709,7 +709,10 @@ def main():
     st.markdown("---")
 
     bvu_diff = cumulative_pv_b[-1] - cumulative_pv[-1] 
-    st.caption(f"Hence building additional stations in this instance brings more value compared to upgrading (${bvu_diff})")
+    if bvu_diff > 0:
+        st.caption(f"Hence building additional stations in this instance brings more value compared to upgrading (${round(bvu_diff,2)})")
+    else:
+        st.caption(f"Hence upgrading seems to be the preferred option over building addtional stations, given the steep initial cost and marginal difference in benefits (${-1*round(bvu_diff,2)})")
     # Add custom CSS to place the footer at the bottom right of the app
     st.markdown("""
         <style>
