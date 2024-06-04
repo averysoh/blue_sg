@@ -543,7 +543,8 @@ def main():
     discount_rate = 0.05  # Annual discount rate
     daily_revenue = revenue_upgrade - revenue_o  # Daily revenue after upgrade, adjust accordingly
     days_per_year = 365  # Days in a year
-    annual_revenues = [daily_revenue * days_per_year for _ in range(5)]  # Repeat the revenue for 5 years
+    std_dev = daily_revenue
+    annual_revenues = [np.sum(np.random.normal(daily_revenue, std_dev, days_per_year)) for _ in range(5)]    # Repeat the revenue for 5 years
     years = ['Year 0', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5']
     npv_df = pd.DataFrame(index=['Revenue', 'Cost', 'Present Value'], columns=years)
     npv_df.loc['Revenue', 'Year 1':] = annual_revenues
@@ -650,7 +651,7 @@ def main():
 
     st.subheader("NPV Upgrade vs Original")
     st.markdown("""
-                Assumes 10K per upgrade 
+                Assumes 10K per upgrade for 5 stations
                 
                 Cost of Upgrade: ${cost_of_upgrade}
 
@@ -693,9 +694,9 @@ def main():
 
     st.subheader("NPV Build additional stations vs Original")
     st.markdown("""
-                Assumes 15K per build and 20k per land aquisition 
+                Assumes 15K per build and 20k per land aquisition for 2 additional stations
                 
-                Cost from building: ${cost_of_upgrade_b}
+                Cost from building: ${cost_of_upgrade_b} 
 
                 Value Creation by building: ${cumul:.2f}
 
