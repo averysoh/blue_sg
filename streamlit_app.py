@@ -666,9 +666,9 @@ def main():
     st.markdown("---")
 
     # NPV mt addition vs original
-    cost_of_upgrade_b = 10000 * len(stations_to_upgrade)  
+    cost_of_upgrade_b = (20000 * 2) + (15000 * 2) # Land aquisition + build cost  
     discount_rate = 0.05  # Annual discount rate
-    additional_revenue_daily = revenue_results_u.flatten() - revenue_results.flatten()
+    additional_revenue_daily = revenue_results_add.flatten() - revenue_results.flatten()
     days_per_year = 365
     years_of_data = len(additional_revenue_daily) // days_per_year
     years_of_data = min(years_of_data, 5)  # Assume we want at most 5 years of data
@@ -693,7 +693,7 @@ def main():
 
     st.subheader("NPV Build additional stations vs Upgrade")
     st.markdown("""
-                Assumes 10K per upgrade 
+                Assumes 15K per build and 20k per land aquisition 
                 
                 Cost from building: ${cost_of_upgrade_b}
 
@@ -708,6 +708,8 @@ def main():
     st.write(npv_df.fillna(0))
     st.markdown("---")
 
+    bvu_diff = cumulative_pv_b[-1] - cumulative_pv[-1] 
+    st.caption(f"Hence building additional stations in this instance brings more value compared to upgrading (${bvu_diff})")
     # Add custom CSS to place the footer at the bottom right of the app
     st.markdown("""
         <style>
