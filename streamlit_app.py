@@ -580,6 +580,27 @@ def main():
             ))
     st.write(npv_df.fillna(0))
     st.markdown("---")
+        # Define the Graphviz diagram as a string
+    graph = """
+        digraph {
+            node [shape=box]
+            // Define nodes
+            root [label="Expand EV Station Capacity"]
+            no [label="No"]
+            original [label="Original Baseline"]
+            yes [label="Yes"]
+            upgrade [label="Upgrade Capacity 4 to 6"]
+            build [label="Build Additional Stations"]
+
+            // Define edges
+            root -> no
+            no -> original
+            root -> yes
+            yes -> upgrade
+            yes -> build
+        }
+    """
+    st.graphviz_chart(graph)
     st.title("Monte Carlo Simulation")
     st.write("A somewhat more accurate static simulation (parameters fixed)")
     with st.expander("Monte Carlo Parameters", expanded=False):
@@ -620,8 +641,8 @@ def main():
     fig_m_park = plot_monte_carlo_cones(np.cumsum(parking_results, axis=1), np.cumsum(parking_results_u, axis=1), np.cumsum(parking_results_add, axis=1), 'Cumulative Unsuccessful Parking Forecast over Time', 'Cumulative Unsuccessful Parking')
     st.plotly_chart(fig_m_rev)
     st.plotly_chart(fig_m_park)
-
-    st.subheader("Seems like adding more stations instead of upgrading performs better")
+    st.write('---')
+    # st.subheader("Seems like adding more stations instead of upgrading performs better")
     st.write("Let us check the cost benefit analysis")
 
     # NPV mt upgrade vs original
@@ -665,28 +686,6 @@ def main():
             ))
     st.write(npv_df.fillna(0))
     st.markdown("---")
-
-    # Define the Graphviz diagram as a string
-    graph = """
-        digraph {
-            node [shape=box]
-            // Define nodes
-            root [label="Expand EV Station Capacity"]
-            no [label="No: Original Baseline"]
-            yes [label="Yes"]
-            upgrade [label="Upgrade Capacity 4 to 6"]
-            build [label="Build Additional Stations"]
-
-            // Define edges
-            root -> no
-            root -> yes
-            yes -> upgrade
-            yes -> build
-        }
-    """
-
-    # Use Streamlit's graphviz_chart to render the graph
-    st.graphviz_chart(graph)
 
     # NPV mt addition vs original
     cost_of_upgrade_b = (20000 * 2) + (15000 * 2) # Land aquisition + build cost  
