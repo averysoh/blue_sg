@@ -361,7 +361,7 @@ def create_visual(G, positions, trip_data, park_q_data, upgraded_nodes=[], seed=
     return fig
 
 def plot_monte_carlo_cones(data_original, data_upgrade, data_added, title, ylabel):
-    num_days = 30
+    num_days = data_original.shape[1]
     days = np.arange(1, num_days + 1)
     fig = go.Figure()
     percentiles = [10, 90] 
@@ -618,8 +618,10 @@ def main():
         **Additional stations built**: 2
         """)
     # Loading arrays from a pickle file
-    with open('data/monte_carlo_simulation_data.pickle', 'rb') as f:
+    with open('data/monte_carlo_simulation_data.pickle_1k', 'rb') as f:
         revenue_results, revenue_results_u, revenue_results_add, parking_results, parking_results_u, parking_results_add = pickle.load(f)
+    # with open('data/monte_carlo_simulation_data.pickle', 'rb') as f:
+    #     revenue_results, revenue_results_u, revenue_results_add, parking_results, parking_results_u, parking_results_add = pickle.load(f)
 
     # Histogram visual
     hist_data = [revenue_results.flatten(), revenue_results_u.flatten(), revenue_results_add.flatten()]
