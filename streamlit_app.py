@@ -618,7 +618,7 @@ def main():
         **Additional stations built**: 2
         """)
     # Loading arrays from a pickle file
-    with open('data/monte_carlo_simulation_data.pickle_1k', 'rb') as f:
+    with open('data/monte_carlo_simulation_data_1k.pickle', 'rb') as f:
         revenue_results, revenue_results_u, revenue_results_add, parking_results, parking_results_u, parking_results_add = pickle.load(f)
     # with open('data/monte_carlo_simulation_data.pickle', 'rb') as f:
     #     revenue_results, revenue_results_u, revenue_results_add, parking_results, parking_results_u, parking_results_add = pickle.load(f)
