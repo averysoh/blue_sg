@@ -578,7 +578,7 @@ def main():
     """.format(
                 payback_msg=payback_msg
             ))
-    st.write(npv_df.fillna(0))
+    st.write(round(npv_df.fillna(0),2))
     st.markdown("---")
         # Define the Graphviz diagram as a string
     graph = """
@@ -616,7 +616,6 @@ def main():
         **Number of stations upgraded**: 5
                             
         **Additional stations built**: 2
-        ---
         """)
     # Loading arrays from a pickle file
     with open('data/monte_carlo_simulation_data.pickle', 'rb') as f:
@@ -684,7 +683,7 @@ def main():
                 cost_of_upgrade = cost_of_upgrade,
                 cumul=cumulative_pv[-1]
             ))
-    st.write(npv_df.fillna(0))
+    st.write(round(npv_df.fillna(0),2))
     st.markdown("---")
 
     # NPV mt addition vs original
@@ -727,7 +726,7 @@ def main():
                 cost_of_upgrade_b = cost_of_upgrade_b,
                 cumul=cumulative_pv_b[-1]
             ))
-    st.write(npv_df.fillna(0))
+    st.write(round(npv_df.fillna(0),2))
     st.markdown("---")
 
     bvu_diff = cumulative_pv_b[-1] - cumulative_pv[-1] 
